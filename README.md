@@ -1,0 +1,1 @@
+A fake React implementation from [url](http://www.mattgreer.org/articles/react-internals-part-one-basic-rendering/).
