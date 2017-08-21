@@ -2,7 +2,7 @@
  * @Author: Ping Qixing
  * @Date: 2017-08-21 11:36:07
  * @Last Modified by: Ping Qixing
- * @Last Modified time: 2017-08-21 20:55:47
+ * @Last Modified time: 2017-08-21 20:58:32
  * @Description: a fake React implemention
  */
 // 创建单个元素的辅助类
@@ -110,8 +110,26 @@ class FeactCompositeComponentWrapper {
 
   updateComponent(prevElement, nextElement) {
     const nextProps = nextElement.props;
+    const inst = this._instance;
 
-    this._performComponentUpdate(nextElement, nextProps);
+    // 在此可以增加 shouldComponentUpdate 和 componentWillReceiveProps 回调
+    if (inst.shouldComponentWillReceiveProps) {
+      inst.shouldComponentWillReceiveProps(nextProps);
+    }
+
+    let shouldUpdate = true;
+
+    if (inst.ShouldComponentUpdate) {
+      shouldUpdate = inst.ShouldComponentUpdate(nextProps);
+    }
+
+    if (shouldUpdate) {
+      this._performComponentUpdate(nextElement, nextProps);  
+    } else {
+      // if skipping the update,
+      // still need to set the latest props
+      inst.props = nextProps;
+    }
   }
 
   _performComponentUpdate(nextElement, nextProps) {
