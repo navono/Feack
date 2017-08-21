@@ -2,7 +2,7 @@
  * @Author: Ping Qixing
  * @Date: 2017-08-21 11:36:07
  * @Last Modified by: Ping Qixing
- * @Last Modified time: 2017-08-21 11:37:35
+ * @Last Modified time: 2017-08-21 18:44:22
  * @Description: a fake React implemention
  */
 // 创建单个元素的辅助类
@@ -44,6 +44,17 @@ class FeactCompositeComponentWrapper {
   }
 }
 
+// 简单的 组合组件
+class TopLevelWrapper {
+  constructor(props) {
+    this.props = props;
+  }
+
+  render() {
+    return this.props;
+  }
+}
+
 const Feact = {
   createElement(type, props, children) {
     const element = {
@@ -78,7 +89,10 @@ const Feact = {
     // 如果是 原生的DOM元素，可以用上面的 render 方法；
     // 如果是 组合组件，就用下面的这个辅助类
     console.log('Composite');
-    const componentInstance = new FeactCompositeComponentWrapper(element);
+
+    // 使用 wrapper 组件
+    const wrapperElement = this.createElement(TopLevelWrapper, element);
+    const componentInstance = new FeactCompositeComponentWrapper(wrapperElement);
     return componentInstance.mountComponent(container);
   }
 };
