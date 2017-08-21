@@ -2,7 +2,7 @@
  * @Author: Ping Qixing
  * @Date: 2017-08-21 11:36:07
  * @Last Modified by: Ping Qixing
- * @Last Modified time: 2017-08-21 20:17:55
+ * @Last Modified time: 2017-08-21 20:55:47
  * @Description: a fake React implemention
  */
 // 创建单个元素的辅助类
@@ -20,6 +20,52 @@ class FeactDOMComponent {
 
     this._hostNode = domElement;
     return domElement;
+  }
+
+  receiveComponent(nextElement) {
+    const prevElement = this._currentElement;
+    this.updateComponent(prevElement, nextElement);
+  }
+
+  updateComponent(prevElement, nextElement) {
+    const lastProps = prevElement.props;
+    const nextProps = nextElement.props;
+
+    this._updateDOMProperties(lastProps, nextProps);
+    this._updateDOMChildren(lastProps, nextProps);
+
+    this._currentElement = nextElement;
+  }
+
+  _updateDOMProperties(lastProps, nextProps) {
+    // mostly update CSS styles
+  }
+
+  _updateDOMChildren(lastProps, nextProps) {
+    // 实际上的 React 在这里做了很多复杂的逻辑处理。
+    // 在此只演示更新 文本
+    const lastContent = lastProps.children;
+    const nextContent = nextProps.children;
+
+    if (!nextContent) {
+      this.updateTextContent('');
+    } else if (lastContent !== nextContent) {
+      this.updateTextContent('' + nextContent);
+    }
+  }
+
+  updateTextContent(text) {
+    const node = this._hostNode;
+    
+    const firstChild = node.firstChild;
+    
+    if (firstChild && firstChild === node.lastChild
+        && firstChild.nodeType === 3) {
+      firstChild.nodeValue = text;
+      return;
+    }
+    
+    node.textContent = text;
   }
 }
 
@@ -56,11 +102,43 @@ class FeactCompositeComponentWrapper {
 
     return FeactReconciler.mountComponent(child, container);
   }
+
+  receiveComponent(nextElement) {
+    const prevElement = this._currentElement;
+    this.updateComponent(prevElement, nextElement);
+  }
+
+  updateComponent(prevElement, nextElement) {
+    const nextProps = nextElement.props;
+
+    this._performComponentUpdate(nextElement, nextProps);
+  }
+
+  _performComponentUpdate(nextElement, nextProps) {
+    this._currentElement = nextElement;
+    const inst = this._instance;
+    inst.props = nextProps;
+
+    this._updateRenderedComponent();
+  }
+
+  _updateRenderedComponent() {
+    const prevComponentInstance = this._renderedComponent;
+    const inst = this._instance;
+    const nextRenderedElement = inst.render();
+
+    FeactReconciler.receiveComponent(prevComponentInstance, nextRenderedElement)
+  }
 }
 
 const FeactReconciler = {
   mountComponent(internalInstance, container) {
     return internalInstance.mountComponent(container);
+  },
+
+  // 增加转发函数
+  receiveComponent(internalInstance, nextElement) {
+    internalInstance.receiveComponent(nextElement);
   }
 }
 
@@ -108,19 +186,41 @@ const Feact = {
   },
 
   render(element, container) {
-    // 此处应该判断 element 是 原生的DOM元素还是 组合组件。
-    // 如果是 原生的DOM元素，可以用上面的 render 方法；
-    // 如果是 组合组件，就用下面的这个辅助类
-
-    // 使用 wrapper 组件
-    const wrapperElement = this.createElement(TopLevelWrapper, element);
-    const componentInstance = new FeactCompositeComponentWrapper(wrapperElement);
-    
-    return FeactReconciler.mountComponent(
-      componentInstance,
-      container
-    );
+    const prevComponent = getTopLevelComponentInContainer(container);
+    if (prevComponent) {
+      return updateRootComponent(
+        prevComponent,
+        element
+      );
+    } else {
+      return renderNewRootComponent(element, container);
+    }
   }
 };
+
+function renderNewRootComponent(element, container) {
+  const wrapperElement = Feact.createElement(TopLevelWrapper, element);
+  const componentInstance = new FeactCompositeComponentWrapper(wrapperElement);
+
+  const markUp = FeactReconciler.mountComponent(
+    componentInstance,
+    container
+  );
+
+  // new line here, store the component instance on the container
+  // we want its _renderedComponent because componentInstance is just
+  // the TopLevelWrapper, which we don't need for updates
+  container.__feactComponentInstance = componentInstance._renderedComponent;
+
+  return markUp;
+}
+
+function getTopLevelComponentInContainer(container) {
+  return container.__feactComponentInstance;
+}
+
+function updateRootComponent(prevComponent, nextElement) {
+  FeactReconciler.receiveComponent(prevComponent, nextElement);
+}
 
 export default Feact;
