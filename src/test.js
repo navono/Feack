@@ -11,6 +11,14 @@ const MyH1 = Feact.createClass({
 });
 
 const MyMessage = Feact.createClass({
+  componentWillMount() {
+    console.log('componentWillMount');
+  },
+
+  componentDidMount() {
+    console.log('componentDidMount');
+  },
+
   render() {
     // 此时这里如果返回一个 组合组件，那么 FeactCompositeComponentWrapper 里
     // 需要相应修改
