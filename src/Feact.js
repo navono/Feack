@@ -2,7 +2,7 @@
  * @Author: Ping Qixing
  * @Date: 2017-08-21 11:36:07
  * @Last Modified by: Ping Qixing
- * @Last Modified time: 2017-08-22 14:27:52
+ * @Last Modified time: 2017-08-22 14:49:44
  * @Description: a fake React implemention
  */
 // 创建单个元素的辅助类
@@ -111,6 +111,8 @@ class FeactCompositeComponentWrapper {
   }
 
   updateComponent(prevElement, nextElement) {
+    this._rendering = true;
+
     const nextProps = nextElement.props;
     const inst = this._instance;
 
@@ -125,8 +127,7 @@ class FeactCompositeComponentWrapper {
     }
 
     let shouldUpdate = true;
-    const nextState = Object.assign({}, inst.state, this._pendingPartialState);
-    this._pendingPartialState = null;
+    const nextState = this._processPendingState();
 
     if (inst.ShouldComponentUpdate) {
       shouldUpdate = inst.ShouldComponentUpdate(nextProps, nextState);
@@ -140,6 +141,8 @@ class FeactCompositeComponentWrapper {
       inst.props = nextProps;
       inst.state = nextState;
     }
+
+    this._rendering = false;
   }
 
   performUpdateIfNecessary() {
@@ -161,6 +164,28 @@ class FeactCompositeComponentWrapper {
     const nextRenderedElement = inst.render();
 
     FeactReconciler.receiveComponent(prevComponentInstance, nextRenderedElement)
+  }
+
+  _processPendingState() {
+    const inst = this._instance;
+    if (!this._pendingPartialState) {
+      return inst.state;
+    }
+
+    let nextState = inst.state;
+    
+    for (let i = 0; i < this._pendingPartialState.length; ++i) {
+      const partialState = this._pendingPartialState[i];
+
+      if (typeof partialState === 'function') {
+        nextState = partialState(nextState);
+      } else {
+        nextState = Object.assign(nextState, this._pendingPartialState[i]);
+      }
+    }
+
+    this._pendingPartialState = null;
+    return nextState;
   }
 }
 
@@ -215,8 +240,16 @@ function FeactComponent() {
 
 FeactComponent.prototype.setState = function(partialState) {
   const internalInstance = FeactInstanceMap.get(this);
-  internalInstance._pendingPartialState = partialState;
-  FeactReconciler.performUpdateIfNecessary(internalInstance);
+
+  // batching all state
+  internalInstance._pendingPartialState = 
+  internalInstance._pendingPartialState || [];
+
+  internalInstance._pendingPartialState.push(partialState);
+
+  if (!internalInstance._rendering) {
+    FeactReconciler.performUpdateIfNecessary(internalInstance);  
+  }
 }
 
 function mixSpecIntoComponent(Constructor, spec) {
