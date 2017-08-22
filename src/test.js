@@ -34,4 +34,24 @@ const MyMessage = Feact.createClass({
   }
 });
 
-export default MyMessage;
+const MyComponent = Feact.createClass({
+  getInitialState() {
+    return {
+      msg: 'calling setState in two seconds'
+    }
+  },
+
+  componentDidMount() {
+    setTimeout(() => {
+      this.setState({
+        msg: 'setState called'
+      })
+    }, 2000);
+  },
+
+  render() {
+    return Feact.createElement('h1', null, this.state.msg);
+  }
+})
+
+export { MyMessage, MyComponent };

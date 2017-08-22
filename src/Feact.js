@@ -2,7 +2,7 @@
  * @Author: Ping Qixing
  * @Date: 2017-08-21 11:36:07
  * @Last Modified by: Ping Qixing
- * @Last Modified time: 2017-08-21 20:58:32
+ * @Last Modified time: 2017-08-22 14:27:52
  * @Description: a fake React implemention
  */
 // 创建单个元素的辅助类
@@ -80,6 +80,8 @@ class FeactCompositeComponentWrapper {
     const componentInstance = new Component(this._currentElement.props);
     this._instance = componentInstance;
 
+    FeactInstanceMap.set(componentInstance, this);
+
     // render 前调用 componentWillMount
     if (componentInstance.componentWillMount) {
       componentInstance.componentWillMount();
@@ -112,30 +114,43 @@ class FeactCompositeComponentWrapper {
     const nextProps = nextElement.props;
     const inst = this._instance;
 
+    const willReceive = prevElement !== nextElement;
+    if (willReceive && inst.componentWillReceiveProps) {
+      inst.componentWillReceiveProps(nextProps);
+    }
+
     // 在此可以增加 shouldComponentUpdate 和 componentWillReceiveProps 回调
     if (inst.shouldComponentWillReceiveProps) {
       inst.shouldComponentWillReceiveProps(nextProps);
     }
 
     let shouldUpdate = true;
+    const nextState = Object.assign({}, inst.state, this._pendingPartialState);
+    this._pendingPartialState = null;
 
     if (inst.ShouldComponentUpdate) {
-      shouldUpdate = inst.ShouldComponentUpdate(nextProps);
+      shouldUpdate = inst.ShouldComponentUpdate(nextProps, nextState);
     }
 
     if (shouldUpdate) {
-      this._performComponentUpdate(nextElement, nextProps);  
+      this._performComponentUpdate(nextElement, nextProps, nextState);  
     } else {
       // if skipping the update,
       // still need to set the latest props
       inst.props = nextProps;
+      inst.state = nextState;
     }
   }
 
-  _performComponentUpdate(nextElement, nextProps) {
+  performUpdateIfNecessary() {
+    this.updateComponent(this._currentElement, this._currentElement);
+  }
+
+  _performComponentUpdate(nextElement, nextProps, nextState) {
     this._currentElement = nextElement;
     const inst = this._instance;
     inst.props = nextProps;
+    inst.state = nextState;
 
     this._updateRenderedComponent();
   }
@@ -157,6 +172,10 @@ const FeactReconciler = {
   // 增加转发函数
   receiveComponent(internalInstance, nextElement) {
     internalInstance.receiveComponent(nextElement);
+  },
+
+  performUpdateIfNecessary(internalInstance) {
+    internalInstance.performUpdateIfNecessary();
   }
 }
 
@@ -180,6 +199,34 @@ class TopLevelWrapper {
   }
 }
 
+const FeactInstanceMap = {
+  set(key, value) {
+    key.__feactInternalInstance = value;
+  },
+
+  get(key) {
+    return key.__feactInternalInstance;
+  }
+};
+
+function FeactComponent() {
+  
+}
+
+FeactComponent.prototype.setState = function(partialState) {
+  const internalInstance = FeactInstanceMap.get(this);
+  internalInstance._pendingPartialState = partialState;
+  FeactReconciler.performUpdateIfNecessary(internalInstance);
+}
+
+function mixSpecIntoComponent(Constructor, spec) {
+  const proto = Constructor.prototype;
+
+  for (const key in spec) {
+    proto[key] = spec[key];
+  }
+}
+
 const Feact = {
   createElement(type, props, children) {
     const element = {
@@ -197,9 +244,13 @@ const Feact = {
   createClass(spec) {
     function Constructor(props) {
       this.props = props;
+
+      const initialState = this.getInitialState ? this.getInitialState() : null;
+      this.state = initialState;
     }
 
-    Constructor.prototype = Object.assign(Constructor.prototype, spec);
+    Constructor.prototype = new FeactComponent();
+    mixSpecIntoComponent(Constructor, spec);
     return Constructor;
   },
 
