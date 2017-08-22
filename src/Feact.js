@@ -2,7 +2,7 @@
  * @Author: Ping Qixing
  * @Date: 2017-08-21 11:36:07
  * @Last Modified by: Ping Qixing
- * @Last Modified time: 2017-08-22 14:49:44
+ * @Last Modified time: 2017-08-22 15:16:39
  * @Description: a fake React implemention
  */
 // 创建单个元素的辅助类
@@ -323,6 +323,21 @@ function getTopLevelComponentInContainer(container) {
 
 function updateRootComponent(prevComponent, nextElement) {
   FeactReconciler.receiveComponent(prevComponent, nextElement);
+}
+
+// Transaction 的思想就是在执行一项任务的前后增加额外的工作
+class Transaction {
+  constructor(wrapper) {
+    this._wrapper = wrapper;
+  }
+
+  perform(method) {
+    const wrapperValue = this._wrapper.initialize();
+
+    method();
+
+    this._wrapper.close(wrapperValue);
+  }
 }
 
 export default Feact;
